@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Hastane Acil Öncelik Sistemi</title>
+  <meta name="description" content="Hastane Acil Öncelik Sistemi — MaxHeap tabanlı triyaj kuyruğu." />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏥</text></svg>" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --navy: #0f172a;
+      --navy-mid: #1e293b;
+      --navy-light: #334155;
+      --accent: #38bdf8;
+      --accent-dark: #0284c7;
+      --red: #ef4444;
+      --red-dark: #b91c1c;
+      --text: #f1f5f9;
+      --text-muted: #94a3b8;
+      --border: #334155;
+      --green: #22c55e;
+      --yellow: #eab308;
+      --orange: #f97316;
+      --radius: 10px;
+    }
+
+    body {
+      display: flex;
+      min-height: 100vh;
+      font-family: system-ui, -apple-system, sans-serif;
+      background: var(--navy);
+      color: var(--text);
+    }
+
+    /* PANELS */
+    .panel { padding: 28px 24px; }
+    .panel--left {
+      width: 320px;
+      min-width: 280px;
+      background: var(--navy-mid);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+    .panel--right {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+      overflow-y: auto;
+    }
+    .panel__title {
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: var(--accent);
+      letter-spacing: .03em;
+    }
+
+    /* FORM */
+    form { display: flex; flex-direction: column; gap: 16px; }
+    .field { display: flex; flex-direction: column; gap: 6px; }
+    label { font-size: .85rem; color: var(--text-muted); font-weight: 500; }
+    label strong { color: var(--accent); font-size: 1rem; }
+    input[type="text"],
+    input[type="number"] {
+      background: var(--navy-light);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 9px 12px;
+      color: var(--text);
+      font-size: .95rem;
+      outline: none;
+      transition: border-color .15s;
+    }
+    input[type="text"]:focus,
+    input[type="number"]:focus { border-color: var(--accent); }
+    input[type="range"] {
+      width: 100%;
+      accent-color: var(--accent);
+      cursor: pointer;
+    }
+    .field__error { font-size: .78rem; color: var(--red); min-height: 16px; }
+
+    /* BUTTONS */
+    .btn {
+      border: none;
+      border-radius: var(--radius);
+      padding: 11px 20px;
+      font-size: .95rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background .15s, transform .08s, opacity .15s;
+    }
+    .btn:active { transform: scale(.97); }
+    .btn:disabled { opacity: .45; cursor: not-allowed; transform: none; }
+    .btn--add { background: var(--accent); color: var(--navy); }
+    .btn--add:hover:not(:disabled) { background: var(--accent-dark); color: #fff; }
+    .btn--treat { background: var(--red); color: #fff; }
+    .btn--treat:hover:not(:disabled) { background: var(--red-dark); }
+
+    /* RIGHT TOP */
+    .right-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid var(--border);
+    }
+    .app-title { font-size: 1.4rem; font-weight: 800; }
+
+    /* SECTION TITLES */
+    .section-title {
+      font-size: .95rem;
+      font-weight: 700;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      margin-bottom: 12px;
+    }
+
+    /* TABLE */
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: .9rem; }
+    th {
+      text-align: left;
+      padding: 8px 12px;
+      background: var(--navy-mid);
+      color: var(--text-muted);
+      font-size: .78rem;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      border-bottom: 1px solid var(--border);
+    }
+    td { padding: 10px 12px; border-bottom: 1px solid var(--border); }
+    tbody tr:hover { background: var(--navy-mid); }
+    tbody tr:first-child td { background: rgba(239,68,68,.08); }
+
+    .badge {
+      display: inline-block;
+      padding: 2px 10px;
+      border-radius: 20px;
+      font-size: .8rem;
+      font-weight: 700;
+      color: #fff;
+    }
+    .badge--low    { background: #16a34a; }
+    .badge--mid    { background: #ca8a04; }
+    .badge--high   { background: #ea580c; }
+    .badge--crit   { background: #dc2626; }
+
+    .rank-1 { font-weight: 800; color: var(--red); }
+    .empty-msg { color: var(--text-muted); font-size: .9rem; padding: 16px 0; }
+
+    /* HISTORY */
+    .history-list { list-style: none; display: flex; flex-direction: column; gap: 8px; }
+    .history-item {
+      background: var(--navy-mid);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 10px 14px;
+      font-size: .88rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      animation: slideIn .25s ease;
+    }
+    .history-item__name { font-weight: 700; }
+    .history-item__meta { color: var(--text-muted); font-size: .8rem; }
+    .history-item__time { color: var(--text-muted); font-size: .78rem; white-space: nowrap; }
+    .history-empty { color: var(--text-muted); font-size: .88rem; }
+
+    /* TOAST */
+    .toast {
+      position: fixed;
+      bottom: 28px;
+      right: 28px;
+      background: var(--navy-light);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 12px 20px;
+      font-size: .9rem;
+      font-weight: 500;
+      color: var(--text);
+      opacity: 0;
+      transform: translateY(10px);
+      transition: opacity .25s, transform .25s;
+      pointer-events: none;
+      max-width: 340px;
+      z-index: 100;
+    }
+    .toast.show { opacity: 1; transform: translateY(0); }
+
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateY(-6px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    @media (max-width: 700px) {
+      body { flex-direction: column; }
+      .panel--left { width: 100%; border-right: none; border-bottom: 1px solid var(--border); }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- LEFT PANEL -->
+  <aside class="panel panel--left">
+    <h2 class="panel__title">Hasta Ekle</h2>
+    <form id="patientForm" novalidate>
+      <div class="field">
+        <label for="name">Hasta Adı</label>
+        <input id="name" type="text" placeholder="Ad Soyad" autocomplete="off" />
+        <span class="field__error" id="nameError"></span>
+      </div>
+      <div class="field">
+        <label for="age">Yaş</label>
+        <input id="age" type="number" min="1" max="120" placeholder="1 – 120" />
+        <span class="field__error" id="ageError"></span>
+      </div>
+      <div class="field">
+        <label for="severity">Aciliyet: <strong id="severityLabel">5</strong> / 10</label>
+        <input id="severity" type="range" min="1" max="10" value="5" />
+      </div>
+      <button type="submit" class="btn btn--add">Hasta Ekle</button>
+    </form>
+  </aside>
+
+  <!-- RIGHT PANEL -->
+  <main class="panel panel--right">
+    <div class="right-top">
+      <h1 class="app-title">Acil Öncelik Kuyruğu</h1>
+      <button id="treatBtn" class="btn btn--treat">Sıradaki Hastayı Tedavi Et</button>
+    </div>
+
+    <section class="queue-section">
+      <h2 class="section-title">Mevcut Kuyruk</h2>
+      <div class="table-wrap">
+        <table id="queueTable">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Ad</th>
+              <th>Yaş</th>
+              <th>Aciliyet</th>
+              <th>Sıra</th>
+            </tr>
+          </thead>
+          <tbody id="queueBody"></tbody>
+        </table>
+        <p id="emptyMsg" class="empty-msg">Kuyrukta hasta bulunmuyor.</p>
+      </div>
+    </section>
+
+    <section class="history-section">
+      <h2 class="section-title">Tedavi Geçmişi</h2>
+      <ul id="historyList" class="history-list">
+        <li class="history-empty">Henüz tedavi edilen hasta yok.</li>
+      </ul>
+    </section>
+  </main>
+
+  <!-- TOAST -->
+  <div id="toast" class="toast" aria-live="polite"></div>
+
+  <script>
+    class Patient {
+      constructor(name, age, severity, arrivalIndex) {
+        this.name = name;
+        this.age = age;
+        this.severity = severity;
+        this.arrivalIndex = arrivalIndex;
+      }
+    }
+
+    class MaxHeap {
+      constructor() {
+        this._heap = [];
+      }
+
+      size() { return this._heap.length; }
+      peek() { return this._heap[0] ?? null; }
+
+      _compare(a, b) {
+        if (b.severity !== a.severity) return b.severity - a.severity;
+        return a.arrivalIndex - b.arrivalIndex;
+      }
+
+      _higher(i, j) {
+        return this._compare(this._heap[i], this._heap[j]) < 0;
+      }
+
+      _swap(i, j) {
+        [this._heap[i], this._heap[j]] = [this._heap[j], this._heap[i]];
+      }
+
+      _siftUp(i) {
+        while (i > 0) {
+          const parent = Math.floor((i - 1) / 2);
+          if (this._higher(i, parent)) {
+            this._swap(i, parent);
+            i = parent;
+          } else break;
+        }
+      }
+
+      _siftDown(i) {
+        const n = this._heap.length;
+        while (true) {
+          let top = i;
+          const l = 2 * i + 1, r = 2 * i + 2;
+          if (l < n && this._higher(l, top)) top = l;
+          if (r < n && this._higher(r, top)) top = r;
+          if (top === i) break;
+          this._swap(i, top);
+          i = top;
+        }
+      }
+
+      insert(patient) {
+        this._heap.push(patient);
+        this._siftUp(this._heap.length - 1);
+      }
+
+      extractMax() {
+        if (this._heap.length === 0) return null;
+        this._swap(0, this._heap.length - 1);
+        const max = this._heap.pop();
+        this._siftDown(0);
+        return max;
+      }
+
+      toSortedArray() {
+        const copy = new MaxHeap();
+        copy._heap = [...this._heap];
+        const result = [];
+        while (copy.size() > 0) result.push(copy.extractMax());
+        return result;
+      }
+    }
+
+    class HospitalQueue {
+      constructor() {
+        this._heap = new MaxHeap();
+        this._arrivalCounter = 0;
+        this.treatmentHistory = [];
+      }
+
+      addPatient(name, age, severity) {
+        const patient = new Patient(name, age, severity, this._arrivalCounter++);
+        this._heap.insert(patient);
+      }
+
+      treatNext() {
+        const patient = this._heap.extractMax();
+        if (!patient) return null;
+        this.treatmentHistory.unshift({ patient, treatedAt: new Date() });
+        return patient;
+      }
+
+      showQueue() {
+        return this._heap.toSortedArray();
+      }
+
+      size() {
+        return this._heap.size();
+      }
+    }
+
+    const queue = new HospitalQueue();
+
+    const samplePatients = [
+      { name: 'Fatma Yılmaz',  age: 67, severity: 9  },
+      { name: 'Mehmet Demir',  age: 34, severity: 6  },
+      { name: 'Ayşe Kaya',     age: 52, severity: 10 },
+      { name: 'Hüseyin Çelik', age: 78, severity: 4  },
+      { name: 'Zeynep Arslan', age: 45, severity: 7  },
+    ];
+    samplePatients.forEach(p => queue.addPatient(p.name, p.age, p.severity));
+
+    function severityBadge(s) {
+      let cls = 'badge--low';
+      if (s >= 9) cls = 'badge--crit';
+      else if (s >= 7) cls = 'badge--high';
+      else if (s >= 4) cls = 'badge--mid';
+      return `<span class="badge ${cls}">${s}</span>`;
+    }
+
+    function escHtml(str) {
+      return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    let _toastTimer = null;
+    function showToast(msg) {
+      const el = document.getElementById('toast');
+      el.textContent = msg;
+      el.classList.add('show');
+      clearTimeout(_toastTimer);
+      _toastTimer = setTimeout(() => el.classList.remove('show'), 3000);
+    }
+
+    function renderQueue() {
+      const patients = queue.showQueue();
+      const tbody = document.getElementById('queueBody');
+      const emptyMsg = document.getElementById('emptyMsg');
+      const treatBtn = document.getElementById('treatBtn');
+
+      treatBtn.disabled = patients.length === 0;
+      emptyMsg.style.display = patients.length === 0 ? 'block' : 'none';
+
+      tbody.innerHTML = patients.map((p, i) => `
+        <tr>
+          <td class="${i === 0 ? 'rank-1' : ''}">${i + 1}</td>
+          <td>${escHtml(p.name)}</td>
+          <td>${p.age}</td>
+          <td>${severityBadge(p.severity)}</td>
+          <td>#${p.arrivalIndex + 1}</td>
+        </tr>
+      `).join('');
+    }
+
+    function renderHistory() {
+      const list = document.getElementById('historyList');
+      if (queue.treatmentHistory.length === 0) {
+        list.innerHTML = '<li class="history-empty">Henüz tedavi edilen hasta yok.</li>';
+        return;
+      }
+      list.innerHTML = queue.treatmentHistory.map(({ patient: p, treatedAt }) => `
+        <li class="history-item">
+          <div>
+            <div class="history-item__name">${escHtml(p.name)}</div>
+            <div class="history-item__meta">Age ${p.age} &nbsp;|&nbsp; ${severityBadge(p.severity)}</div>
+          </div>
+          <div class="history-item__time">${treatedAt.toLocaleTimeString()}</div>
+        </li>
+      `).join('');
+    }
+
+    document.getElementById('severity').addEventListener('input', e => {
+      document.getElementById('severityLabel').textContent = e.target.value;
+    });
+
+    document.getElementById('patientForm').addEventListener('submit', e => {
+      e.preventDefault();
+      const nameEl     = document.getElementById('name');
+      const ageEl      = document.getElementById('age');
+      const severityEl = document.getElementById('severity');
+      const nameErr    = document.getElementById('nameError');
+      const ageErr     = document.getElementById('ageError');
+
+      let valid = true;
+      nameErr.textContent = '';
+      ageErr.textContent  = '';
+
+      const name = nameEl.value.trim();
+      const age  = parseInt(ageEl.value, 10);
+
+      if (!name) { nameErr.textContent = 'Ad alanı zorunludur.'; valid = false; }
+      if (!ageEl.value || isNaN(age) || age < 1 || age > 120) {
+        ageErr.textContent = 'Yaş 1 ile 120 arasında olmalıdır.'; valid = false;
+      }
+      if (!valid) return;
+
+      const severity = parseInt(severityEl.value, 10);
+      queue.addPatient(name, age, severity);
+      renderQueue();
+      showToast(`Eklendi: ${name} (aciliyet ${severity})`);
+
+      nameEl.value = '';
+      ageEl.value  = '';
+      severityEl.value = 5;
+      document.getElementById('severityLabel').textContent = '5';
+    });
+
+    document.getElementById('treatBtn').addEventListener('click', () => {
+      const patient = queue.treatNext();
+      if (!patient) return;
+      renderQueue();
+      renderHistory();
+      showToast(`Şu an tedavi ediliyor: ${patient.name}`);
+    });
+
+    renderQueue();
+    renderHistory();
+  </script>
+</body>
+</html>
