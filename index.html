@@ -469,8 +469,7 @@
       _toastTimer = setTimeout(() => el.classList.remove('show'), 3000);
     }
 
-    function renderStats() {
-      const waiting = queue.showQueue();
+    function renderStats(waiting) {
       document.getElementById('statTotal').textContent = queue.totalAddedToday;
       document.getElementById('statWaiting').textContent = queue.size();
       document.getElementById('statAvgSev').textContent = waiting.length
@@ -496,7 +495,7 @@
           <td>#${p.arrivalIndex + 1}</td>
         </tr>
       `).join('');
-      renderStats();
+      renderStats(patients);
     }
 
     function renderHistory() {
@@ -562,7 +561,6 @@
 
     renderQueue();
     renderHistory();
-    renderStats();
   </script>
 </body>
 </html>
