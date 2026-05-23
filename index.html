@@ -344,23 +344,43 @@
       }
     }
 
+    const DEPARTMENTS = ['Acil', 'Yoğun Bakım', 'Cerrahi', 'Kardiyoloji'];
+
     class HospitalQueue {
       constructor() {
         this._heap = new MaxHeap();
         this._arrivalCounter = 0;
+        this.totalAddedToday = 0;
+        this.inTreatment = null; // { patient, department, startedAt }
         this.treatmentHistory = [];
       }
 
       addPatient(name, age, severity) {
         const patient = new Patient(name, age, severity, this._arrivalCounter++);
         this._heap.insert(patient);
+        this.totalAddedToday++;
       }
 
       treatNext() {
+        if (this.inTreatment) return null;
         const patient = this._heap.extractMax();
         if (!patient) return null;
-        this.treatmentHistory.unshift({ patient, treatedAt: new Date() });
-        return patient;
+        const department = DEPARTMENTS[Math.floor(Math.random() * DEPARTMENTS.length)];
+        this.inTreatment = { patient, department, startedAt: new Date() };
+        return this.inTreatment;
+      }
+
+      discharge() {
+        if (!this.inTreatment) return null;
+        const record = {
+          patient: this.inTreatment.patient,
+          department: this.inTreatment.department,
+          treatedAt: this.inTreatment.startedAt,
+          dischargedAt: new Date(),
+        };
+        this.treatmentHistory.unshift(record);
+        this.inTreatment = null;
+        return record;
       }
 
       showQueue() {
