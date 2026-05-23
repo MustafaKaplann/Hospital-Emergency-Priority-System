@@ -165,15 +165,54 @@
       padding: 10px 14px;
       font-size: .88rem;
       display: flex;
+      flex-direction: column;
+      animation: slideIn .25s ease;
+    }
+    .history-item__row {
+      display: flex;
       justify-content: space-between;
       align-items: center;
       gap: 12px;
-      animation: slideIn .25s ease;
+      flex-wrap: wrap;
     }
-    .history-item__name { font-weight: 700; }
-    .history-item__meta { color: var(--text-muted); font-size: .8rem; }
-    .history-item__time { color: var(--text-muted); font-size: .78rem; white-space: nowrap; }
-    .history-empty { color: var(--text-muted); font-size: .88rem; }
+    .history-item__name  { font-weight: 700; }
+    .history-item__meta  { color: var(--text-muted); font-size: .8rem; margin-top: 3px; }
+    .history-item__right { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .history-item__time  { color: var(--text-muted); font-size: .78rem; white-space: nowrap; }
+    .history-empty       { color: var(--text-muted); font-size: .88rem; }
+
+    /* RE-QUEUE BUTTON + FORM */
+    .btn-requeue {
+      background: none;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 4px 10px;
+      font-size: .78rem;
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: border-color .15s, color .15s;
+    }
+    .btn-requeue:hover { border-color: var(--accent); color: var(--accent); }
+    .requeue-form {
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .requeue-form__label { font-size: .82rem; color: var(--text-muted); white-space: nowrap; }
+    .requeue-slider { flex: 1; min-width: 80px; accent-color: var(--accent); cursor: pointer; }
+    .btn-cancel-requeue {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      font-size: .82rem;
+      cursor: pointer;
+      padding: 4px 0;
+    }
+    .btn-cancel-requeue:hover { color: var(--text); }
 
     /* TOAST */
     .toast {
@@ -659,13 +698,35 @@
         list.innerHTML = '<li class="history-empty">Henüz tedavi edilen hasta yok.</li>';
         return;
       }
-      list.innerHTML = queue.treatmentHistory.map(({ patient: p, treatedAt }) => `
+      list.innerHTML = queue.treatmentHistory.map(({ patient: p, department, dischargedAt }) => `
         <li class="history-item">
-          <div>
-            <div class="history-item__name">${escHtml(p.name)}</div>
-            <div class="history-item__meta">Age ${p.age} &nbsp;|&nbsp; ${severityBadge(p.severity)}</div>
+          <div class="history-item__row">
+            <div>
+              <div class="history-item__name">${escHtml(p.name)}</div>
+              <div class="history-item__meta">
+                Yaş ${p.age} &nbsp;|&nbsp; ${severityBadge(p.severity)}
+                &nbsp;|&nbsp; <span class="dept-badge">${escHtml(department)}</span>
+              </div>
+            </div>
+            <div class="history-item__right">
+              <span class="status-badge status--discharged">Taburcu</span>
+              <div class="history-item__time">${dischargedAt.toLocaleTimeString('tr-TR')}</div>
+              <button class="btn-requeue"
+                data-name="${escHtml(p.name)}"
+                data-age="${p.age}"
+                data-sev="${p.severity}">Yeniden Kuyruğa Al</button>
+            </div>
           </div>
-          <div class="history-item__time">${treatedAt.toLocaleTimeString()}</div>
+          <div class="requeue-form" hidden>
+            <label class="requeue-form__label">
+              Yeni Aciliyet: <strong class="requeue-sev-label">${Math.min(p.severity + 1, 10)}</strong> / 10
+            </label>
+            <input type="range" class="requeue-slider" min="1" max="10"
+              value="${Math.min(p.severity + 1, 10)}" />
+            <button class="btn btn--add btn-requeue-confirm"
+              style="padding:7px 14px;font-size:.85rem">Ekle</button>
+            <button class="btn-cancel-requeue">İptal</button>
+          </div>
         </li>
       `).join('');
     }
@@ -720,6 +781,45 @@
       renderQueue();
       renderHistory();
       showToast('Hasta taburcu edildi.');
+    });
+
+    document.getElementById('historyList').addEventListener('click', e => {
+      const reqBtn = e.target.closest('.btn-requeue');
+      if (reqBtn) {
+        const item = reqBtn.closest('.history-item');
+        item.querySelector('.requeue-form').hidden = false;
+        reqBtn.style.display = 'none';
+        return;
+      }
+      const cancelBtn = e.target.closest('.btn-cancel-requeue');
+      if (cancelBtn) {
+        const item = cancelBtn.closest('.history-item');
+        item.querySelector('.requeue-form').hidden = true;
+        item.querySelector('.btn-requeue').style.display = '';
+        return;
+      }
+      const confirmBtn = e.target.closest('.btn-requeue-confirm');
+      if (confirmBtn) {
+        const item = confirmBtn.closest('.history-item');
+        const slider = item.querySelector('.requeue-slider');
+        const reqBtn = item.querySelector('.btn-requeue');
+        const name = reqBtn.dataset.name;
+        const age = parseInt(reqBtn.dataset.age, 10);
+        const newSev = parseInt(slider.value, 10);
+        queue.addPatient(name, age, newSev);
+        item.querySelector('.requeue-form').hidden = true;
+        reqBtn.style.display = '';
+        renderQueue();
+        renderHistory();
+        showToast(`${name} yeniden kuyruğa alındı (aciliyet ${newSev})`);
+      }
+    });
+
+    document.getElementById('historyList').addEventListener('input', e => {
+      if (e.target.classList.contains('requeue-slider')) {
+        const item = e.target.closest('.history-item');
+        item.querySelector('.requeue-sev-label').textContent = e.target.value;
+      }
     });
 
     ['filterName', 'filterMinSev', 'filterMaxSev'].forEach(id => {
