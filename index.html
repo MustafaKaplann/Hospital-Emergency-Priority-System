@@ -264,6 +264,64 @@
       text-transform: uppercase;
       letter-spacing: .06em;
     }
+
+    /* FILTER BAR */
+    .filter-bar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-bottom: 12px;
+    }
+    .filter-input {
+      flex: 1;
+      min-width: 140px;
+      background: var(--navy-light);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 7px 10px;
+      color: var(--text);
+      font-size: .88rem;
+      outline: none;
+      transition: border-color .15s;
+    }
+    .filter-input:focus { border-color: var(--accent); }
+    .filter-sev { display: flex; align-items: center; gap: 6px; }
+    .filter-sev-label { font-size: .82rem; color: var(--text-muted); white-space: nowrap; }
+    .filter-num {
+      width: 52px;
+      background: var(--navy-light);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 7px 8px;
+      color: var(--text);
+      font-size: .88rem;
+      outline: none;
+      text-align: center;
+      transition: border-color .15s;
+    }
+    .filter-num:focus { border-color: var(--accent); }
+    .btn-link {
+      background: none;
+      border: none;
+      color: var(--accent);
+      font-size: .82rem;
+      cursor: pointer;
+      padding: 4px 2px;
+      text-decoration: underline;
+      text-underline-offset: 2px;
+    }
+
+    /* STATUS BADGES */
+    .status-badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 20px;
+      font-size: .75rem;
+      font-weight: 600;
+    }
+    .status--waiting    { background: rgba(148,163,184,.14); color: var(--text-muted); }
+    .status--discharged { background: rgba(34,197,94,.14);   color: var(--green); }
   </style>
 </head>
 <body>
@@ -329,7 +387,17 @@
     </section>
 
     <section class="queue-section">
-      <h2 class="section-title">Mevcut Kuyruk</h2>
+      <h2 class="section-title" style="margin-bottom:10px">Mevcut Kuyruk</h2>
+      <div class="filter-bar">
+        <input id="filterName" type="text" placeholder="İsme göre ara…" class="filter-input" autocomplete="off" />
+        <div class="filter-sev">
+          <span class="filter-sev-label">Aciliyet:</span>
+          <input id="filterMinSev" type="number" min="1" max="10" placeholder="Min" class="filter-num" />
+          <span class="filter-sev-label">–</span>
+          <input id="filterMaxSev" type="number" min="1" max="10" placeholder="Max" class="filter-num" />
+        </div>
+        <button id="clearFilter" class="btn-link" style="display:none">Filtreyi Temizle</button>
+      </div>
       <div class="table-wrap">
         <table id="queueTable">
           <thead>
@@ -338,7 +406,7 @@
               <th>Ad</th>
               <th>Yaş</th>
               <th>Aciliyet</th>
-              <th>Sıra</th>
+              <th>Durum</th>
             </tr>
           </thead>
           <tbody id="queueBody"></tbody>
@@ -533,25 +601,56 @@
       document.getElementById('treatDept').textContent = it.department;
     }
 
+    function getFilter() {
+      const name = (document.getElementById('filterName')?.value ?? '').trim().toLowerCase();
+      const minRaw = document.getElementById('filterMinSev')?.value;
+      const maxRaw = document.getElementById('filterMaxSev')?.value;
+      return {
+        name,
+        minSev: minRaw ? parseInt(minRaw, 10) : null,
+        maxSev: maxRaw ? parseInt(maxRaw, 10) : null,
+      };
+    }
+
+    function applyFilter(patients) {
+      const { name, minSev, maxSev } = getFilter();
+      return patients.filter(p => {
+        if (name && !p.name.toLowerCase().includes(name)) return false;
+        if (minSev !== null && p.severity < minSev) return false;
+        if (maxSev !== null && p.severity > maxSev) return false;
+        return true;
+      });
+    }
+
     function renderQueue() {
-      const patients = queue.showQueue();
+      const all = queue.showQueue();
+      const { name, minSev, maxSev } = getFilter();
+      const hasFilter = !!(name || minSev !== null || maxSev !== null);
+      const clearBtn = document.getElementById('clearFilter');
+      if (clearBtn) clearBtn.style.display = hasFilter ? 'inline' : 'none';
+
+      const patients = applyFilter(all);
       const tbody = document.getElementById('queueBody');
       const emptyMsg = document.getElementById('emptyMsg');
       const treatBtn = document.getElementById('treatBtn');
 
-      treatBtn.disabled = queue.size() === 0 || queue.inTreatment !== null;
+      treatBtn.disabled = all.length === 0 || queue.inTreatment !== null;
       emptyMsg.style.display = patients.length === 0 ? 'block' : 'none';
+      emptyMsg.textContent = hasFilter && all.length > 0
+        ? 'Sonuç bulunamadı.'
+        : 'Kuyrukta hasta bulunmuyor.';
 
       tbody.innerHTML = patients.map((p, i) => `
         <tr>
-          <td class="${i === 0 ? 'rank-1' : ''}">${i + 1}</td>
+          <td class="${i === 0 && !hasFilter ? 'rank-1' : ''}">${i + 1}</td>
           <td>${escHtml(p.name)}</td>
           <td>${p.age}</td>
           <td>${severityBadge(p.severity)}</td>
-          <td>#${p.arrivalIndex + 1}</td>
+          <td><span class="status-badge status--waiting">Bekliyor</span></td>
         </tr>
       `).join('');
-      renderStats(patients);
+
+      renderStats(all);
     }
 
     function renderHistory() {
@@ -621,6 +720,17 @@
       renderQueue();
       renderHistory();
       showToast('Hasta taburcu edildi.');
+    });
+
+    ['filterName', 'filterMinSev', 'filterMaxSev'].forEach(id => {
+      document.getElementById(id)?.addEventListener('input', renderQueue);
+    });
+
+    document.getElementById('clearFilter')?.addEventListener('click', () => {
+      document.getElementById('filterName').value = '';
+      document.getElementById('filterMinSev').value = '';
+      document.getElementById('filterMaxSev').value = '';
+      renderQueue();
     });
 
     renderQueue();
