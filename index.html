@@ -206,6 +206,36 @@
       .panel--left { width: 100%; border-right: none; border-bottom: 1px solid var(--border); }
     }
 
+    /* TREATMENT ZONE */
+    .treatment-zone {
+      background: rgba(56,189,248,.06);
+      border: 1px solid var(--accent);
+      border-radius: var(--radius);
+      padding: 16px 20px;
+    }
+    .treatment-card {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+    .treatment-card__name { font-size: 1rem; font-weight: 700; }
+    .treatment-card__meta { font-size: .85rem; color: var(--text-muted); margin-top: 4px; }
+    .treatment-card__right { display: flex; align-items: center; gap: 12px; }
+    .dept-badge {
+      display: inline-block;
+      padding: 3px 10px;
+      border-radius: 20px;
+      font-size: .78rem;
+      font-weight: 700;
+      background: rgba(56,189,248,.12);
+      color: var(--accent);
+      border: 1px solid rgba(56,189,248,.28);
+    }
+    .btn--discharge { background: var(--green); color: #fff; }
+    .btn--discharge:hover:not(:disabled) { background: #16a34a; }
+
     /* STATS */
     .stats-section {
       display: flex;
@@ -280,6 +310,21 @@
       <div class="stat-card">
         <div class="stat-value" id="statAvgSev">—</div>
         <div class="stat-label">Ort. Aciliyet</div>
+      </div>
+    </section>
+
+    <!-- TREATMENT ZONE (visible only when inTreatment !== null) -->
+    <section id="treatmentZone" class="treatment-zone" hidden>
+      <h2 class="section-title" style="margin-bottom:12px">Şu An Tedavide</h2>
+      <div class="treatment-card">
+        <div class="treatment-card__info">
+          <div class="treatment-card__name" id="treatName"></div>
+          <div class="treatment-card__meta" id="treatMeta"></div>
+        </div>
+        <div class="treatment-card__right">
+          <span class="dept-badge" id="treatDept"></span>
+          <button id="dischargeBtn" class="btn btn--discharge">Taburcu Et</button>
+        </div>
       </div>
     </section>
 
@@ -477,13 +522,24 @@
         : '—';
     }
 
+    function renderInTreatment() {
+      const zone = document.getElementById('treatmentZone');
+      const it = queue.inTreatment;
+      if (!it) { zone.hidden = true; return; }
+      zone.hidden = false;
+      document.getElementById('treatName').textContent = it.patient.name;
+      document.getElementById('treatMeta').innerHTML =
+        `Yaş ${it.patient.age} &nbsp;|&nbsp; ${severityBadge(it.patient.severity)}`;
+      document.getElementById('treatDept').textContent = it.department;
+    }
+
     function renderQueue() {
       const patients = queue.showQueue();
       const tbody = document.getElementById('queueBody');
       const emptyMsg = document.getElementById('emptyMsg');
       const treatBtn = document.getElementById('treatBtn');
 
-      treatBtn.disabled = patients.length === 0;
+      treatBtn.disabled = queue.size() === 0 || queue.inTreatment !== null;
       emptyMsg.style.display = patients.length === 0 ? 'block' : 'none';
 
       tbody.innerHTML = patients.map((p, i) => `
@@ -552,15 +608,24 @@
     });
 
     document.getElementById('treatBtn').addEventListener('click', () => {
-      const patient = queue.treatNext();
-      if (!patient) return;
+      const result = queue.treatNext();
+      if (!result) return;
+      renderInTreatment();
+      renderQueue();
+      showToast(`Tedaviye alındı: ${result.patient.name} → ${result.department}`);
+    });
+
+    document.getElementById('dischargeBtn').addEventListener('click', () => {
+      queue.discharge();
+      renderInTreatment();
       renderQueue();
       renderHistory();
-      showToast(`Şu an tedavi ediliyor: ${patient.name}`);
+      showToast('Hasta taburcu edildi.');
     });
 
     renderQueue();
     renderHistory();
+    renderInTreatment();
   </script>
 </body>
 </html>
