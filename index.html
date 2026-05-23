@@ -205,6 +205,35 @@
       body { flex-direction: column; }
       .panel--left { width: 100%; border-right: none; border-bottom: 1px solid var(--border); }
     }
+
+    /* STATS */
+    .stats-section {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .stat-card {
+      flex: 1;
+      min-width: 90px;
+      background: var(--navy-mid);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px 16px;
+      text-align: center;
+    }
+    .stat-value {
+      font-size: 1.6rem;
+      font-weight: 800;
+      color: var(--accent);
+      line-height: 1;
+      margin-bottom: 4px;
+    }
+    .stat-label {
+      font-size: .74rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: .06em;
+    }
   </style>
 </head>
 <body>
@@ -237,6 +266,22 @@
       <h1 class="app-title">Acil Öncelik Kuyruğu</h1>
       <button id="treatBtn" class="btn btn--treat">Sıradaki Hastayı Tedavi Et</button>
     </div>
+
+    <!-- STATS -->
+    <section class="stats-section">
+      <div class="stat-card">
+        <div class="stat-value" id="statTotal">0</div>
+        <div class="stat-label">Bugün Eklenen</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="statWaiting">0</div>
+        <div class="stat-label">Şu An Bekliyor</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="statAvgSev">—</div>
+        <div class="stat-label">Ort. Aciliyet</div>
+      </div>
+    </section>
 
     <section class="queue-section">
       <h2 class="section-title">Mevcut Kuyruk</h2>
@@ -424,6 +469,15 @@
       _toastTimer = setTimeout(() => el.classList.remove('show'), 3000);
     }
 
+    function renderStats() {
+      const waiting = queue.showQueue();
+      document.getElementById('statTotal').textContent = queue.totalAddedToday;
+      document.getElementById('statWaiting').textContent = queue.size();
+      document.getElementById('statAvgSev').textContent = waiting.length
+        ? (waiting.reduce((s, p) => s + p.severity, 0) / waiting.length).toFixed(1)
+        : '—';
+    }
+
     function renderQueue() {
       const patients = queue.showQueue();
       const tbody = document.getElementById('queueBody');
@@ -442,6 +496,7 @@
           <td>#${p.arrivalIndex + 1}</td>
         </tr>
       `).join('');
+      renderStats();
     }
 
     function renderHistory() {
@@ -507,6 +562,7 @@
 
     renderQueue();
     renderHistory();
+    renderStats();
   </script>
 </body>
 </html>
