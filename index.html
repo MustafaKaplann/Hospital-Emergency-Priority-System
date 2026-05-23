@@ -803,9 +803,7 @@
         const item = confirmBtn.closest('.history-item');
         const slider = item.querySelector('.requeue-slider');
         const reqBtn = item.querySelector('.btn-requeue');
-        const _t = document.createElement('textarea');
-        _t.innerHTML = reqBtn.dataset.name;
-        const name = _t.value;
+        const name = reqBtn.dataset.name;
         const age = parseInt(reqBtn.dataset.age, 10);
         const newSev = parseInt(slider.value, 10);
         queue.addPatient(name, age, newSev);
